@@ -1,0 +1,9 @@
+#!/bin/bash
+
+ tervita() {
+ 	echo "Tere!"
+ 	echo "Tanane kuupaev on:"
+ 	date
+ }
+
+ tervita

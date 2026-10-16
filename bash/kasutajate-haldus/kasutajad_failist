@@ -1,0 +1,25 @@
+#!/bin/bash
+set -euo pipefail
+
+if (( EUID != 0 )); then
+    echo "Käivita skript sudo kaudu." >&2
+    exit 1
+fi
+
+if (( $# != 1 )); then
+    echo "Kasutamine: bash $0 kasutajate_fail" >&2
+    exit 1
+fi
+
+if [[ ! -f "$1" || ! -r "$1" ]]; then
+    echo "Sisendfail puudub või pole loetav." >&2
+    exit 1
+fi
+
+skriptikaust="$(cd -- "$(dirname -- "$0")" && pwd)"
+
+while IFS= read -r nimi || [[ -n "$nimi" ]]; do
+    nimi="${nimi%$'\r'}"
+    [[ -z "$nimi" ]] && continue
+    bash "$skriptikaust/lisa_kasutaja" "$nimi"
+done < "$1"

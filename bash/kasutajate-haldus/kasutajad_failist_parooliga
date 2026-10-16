@@ -1,0 +1,42 @@
+#!/bin/bash
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+if (( EUID != 0 )); then
+    echo "Käivita skript sudo kaudu." >&2
+    exit 1
+fi
+
+if (( $# != 1 )); then
+    echo "Kasutamine: bash $0 kasutajate_ja_paroolide_fail" >&2
+    exit 1
+fi
+
+if [[ ! -f "$1" || ! -r "$1" ]]; then
+    echo "Sisendfail puudub või pole loetav." >&2
+    exit 1
+fi
+
+skriptikaust="$(cd -- "$(dirname -- "$0")" && pwd)"
+
+while IFS= read -r rida || [[ -n "$rida" ]]; do
+    rida="${rida%$'\r'}"
+    [[ -z "$rida" ]] && continue
+
+    if [[ "$rida" != *:* ]]; then
+        echo "Vigane rida: oodatud kasutajanimi:parool." >&2
+        exit 1
+    fi
+
+    nimi="${rida%%:*}"
+    parool="${rida#*:}"
+
+    if [[ -z "$parool" || "$parool" == *:* ]]; then
+        echo "Parool peab olema mittetühi ega tohi sisaldada koolonit." >&2
+        exit 1
+    fi
+
+    bash "$skriptikaust/lisa_kasutaja" "$nimi"
+    printf '%s:%s\n' "$nimi" "$parool" | chpasswd
+    passwd -S "$nimi"
+done < "$1"

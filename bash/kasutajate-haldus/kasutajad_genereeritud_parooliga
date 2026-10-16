@@ -1,5 +1,9 @@
 #!/bin/bash
 set -euo pipefail
+if (( EUID != 0 )) || [[ -n "${SUDO_USER:-}" || -n "${SUDO_UID:-}" ]]; then
+    echo "Lubatud ainult otse root-kasutajana. Sudo kaudu käivitamine on keelatud." >&2
+    exit 1
+fi
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
 if (( EUID != 0 )); then

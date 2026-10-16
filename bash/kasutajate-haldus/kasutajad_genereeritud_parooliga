@@ -1,0 +1,52 @@
+#!/bin/bash
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+if (( EUID != 0 )); then
+    echo "Käivita skript root-õigustes." >&2
+    exit 1
+fi
+
+if (( $# != 1 )); then
+    echo "Kasutamine: bash $0 kasutajate_fail" >&2
+    exit 1
+fi
+
+if [[ ! -f "$1" || ! -r "$1" ]]; then
+    echo "Sisendfail puudub või pole loetav." >&2
+    exit 1
+fi
+
+if ! command -v pwgen >/dev/null; then
+    echo "Paigalda pwgen: apt-get install pwgen" >&2
+    exit 1
+fi
+
+logi="/var/log/loodud_kasutajad_paroolidega"
+umask 077
+touch "$logi"
+chmod 600 "$logi"
+
+while IFS= read -r nimi || [[ -n "$nimi" ]]; do
+    nimi="${nimi%$'\r'}"
+    [[ -z "$nimi" ]] && continue
+
+    if [[ ! "$nimi" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
+        echo "Vigane kasutajanimi: $nimi" >&2
+        exit 1
+    fi
+
+    if getent passwd "$nimi" >/dev/null; then
+        echo "Kasutaja juba olemas, jätan vahele: $nimi"
+        continue
+    fi
+
+    parool="$(pwgen -s -0 8 1)"
+    useradd -m -U -k /etc/skel -s /bin/bash "$nimi"
+    printf '%s:%s\n' "$nimi" "$parool" >> "$logi"
+    printf '%s:%s\n' "$nimi" "$parool" | chpasswd
+    echo "Loodud: $nimi"
+    passwd -S "$nimi"
+done < "$1"
+
+echo "Paroolide logifail: $logi"

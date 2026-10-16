@@ -1,0 +1,32 @@
+#!/bin/bash
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+if (( EUID != 0 )); then
+    echo "Käivita skript root-õigustes: sudo bash $0 kasutajanimi" >&2
+    exit 1
+fi
+
+if (( $# != 1 )); then
+    echo "Kasutamine: bash $0 kasutajanimi" >&2
+    exit 1
+fi
+
+nimi="$1"
+
+if [[ ! "$nimi" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
+    echo "Vigane kasutajanimi: $nimi" >&2
+    exit 1
+fi
+
+if getent passwd "$nimi" >/dev/null; then
+    echo "Kasutaja on juba olemas: $nimi" >&2
+    exit 1
+fi
+
+useradd -m -U -k /etc/skel -s /bin/bash "$nimi"
+
+echo "Kasutaja loodud:"
+getent passwd "$nimi"
+passwd -S "$nimi"
+ls -la "/home/$nimi"

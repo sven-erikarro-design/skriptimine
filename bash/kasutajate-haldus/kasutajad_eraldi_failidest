@@ -1,0 +1,62 @@
+#!/bin/bash
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+if (( EUID != 0 )); then
+    echo "Käivita skript sudo kaudu." >&2
+    exit 1
+fi
+
+if (( $# != 2 )); then
+    echo "Kasutamine: bash $0 kasutajate_fail paroolide_fail" >&2
+    exit 1
+fi
+
+for fail in "$@"; do
+    if [[ ! -f "$fail" || ! -r "$fail" ]]; then
+        echo "Fail puudub või pole loetav: $fail" >&2
+        exit 1
+    fi
+done
+
+mapfile -t nimed < "$1"
+mapfile -t paroolid < "$2"
+
+if (( ${#nimed[@]} == 0 || ${#nimed[@]} != ${#paroolid[@]} )); then
+    echo "Failid peavad sisaldama sama palju ridu ega tohi olla tühjad." >&2
+    exit 1
+fi
+
+declare -A nahtud=()
+
+for i in "${!nimed[@]}"; do
+    nimed[i]="${nimed[i]%$'\r'}"
+    paroolid[i]="${paroolid[i]%$'\r'}"
+    nimi="${nimed[i]}"
+    parool="${paroolid[i]}"
+
+    if [[ ! "$nimi" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]; then
+        echo "Vigane kasutajanimi real $((i + 1))." >&2
+        exit 1
+    fi
+
+    if [[ -z "$parool" || "$parool" == *:* ]]; then
+        echo "Vigane parool real $((i + 1))." >&2
+        exit 1
+    fi
+
+    if getent passwd "$nimi" >/dev/null || [[ -n "${nahtud[$nimi]:-}" ]]; then
+        echo "Kasutaja on juba olemas või kordub: $nimi" >&2
+        exit 1
+    fi
+
+    nahtud["$nimi"]=1
+done
+
+for i in "${!nimed[@]}"; do
+    nimi="${nimed[i]}"
+    useradd -m -U -k /etc/skel -s /bin/bash "$nimi"
+    printf '%s:%s\n' "$nimi" "${paroolid[i]}" | chpasswd
+    echo "Loodud: $nimi"
+    passwd -S "$nimi"
+done
